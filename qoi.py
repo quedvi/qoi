@@ -43,7 +43,7 @@ class Qoi:
 
     def load(self, file_name) -> 'Qoi':
         self.header = { "name": file_name }
-        self.file = open(self.header['name'], "rb")
+        self.file = open(file_name, "rb")
 
         header = bytearray(self.file.read(14))
         if header[0:4] != b'qoif': return None
@@ -58,17 +58,59 @@ class Qoi:
         self.__decode()
         return self
 
+    def save(self, file_name, data) -> 'Qoi':
+        height, width, channels = data.shape
+        self.image = data
+        self.file = open(file_name, "wb")
+        self.header = { "name": file_name }
+        self.header["head"      ] = b'qoif'
+        self.header["width"     ] = width
+        self.header["height"    ] = height
+        self.header["channels"  ] = channels
+        self.header["colorspace"] = 0
+
+
+        self.__write_header()
+        self.__encode()
+        self.file.close()
+        return self
+
+    def __encode(self) -> None:
+        channels = self.header["channels"]
+        print(channels)
+        for i in range(self.height()):
+            for j in range(self.width()):
+                if channels == 3:
+                   frame = bytearray(4)
+                   frame[0] = self.QOI_OP_RGB
+                   frame[1] = self.image[i,j,0]
+                   frame[2] = self.image[i,j,1]
+                   frame[3] = self.image[i,j,2]
+                   self.file.write(frame)
+                   continue
+
+                if channels == 4:
+                   frame = bytearray(5)
+                   frame[0] = self.QOI_OP_RGBA
+                   frame[1] = self.image[i,j,0]
+                   frame[2] = self.image[i,j,1]
+                   frame[3] = self.image[i,j,2]
+                   frame[4] = self.image[i,j,3]
+                   self.file.write(frame)
+                   continue
+        self.file.write(bytearray(8))
+
     def __repr__(self) -> str:
         return str(self.header)
     
     def height(self) -> int:
-        return self.header['height']
+        return self.header["height"]
 
     def width(self) -> int:
-        return self.header['width']
+        return self.header["width"]
 
     def channels(self) -> int:
-        return self.header['channels']
+        return self.header["channels"]
 
     def image(self) -> list:
         return self.image
@@ -80,6 +122,20 @@ class Qoi:
             data = [np.array([np.uint8(x.r), np.uint8(x.g), np.uint8(x.b), np.uint8(x.a)]) for x in self.image]
         array = np.array(data).reshape(self.height(), self.width(), self.channels())
         return array
+
+    def __write_header(self) -> None:
+        self.file.write(bytearray(self.header["head"]))
+        self.file.write(self.__convert_int(self.header["width" ]))
+        self.file.write(self.__convert_int(self.header["height"]))
+        self.file.write(self.header["channels"  ].to_bytes(1, byteorder = 'little'))
+        self.file.write(self.header["colorspace"].to_bytes(1, byteorder = 'little'))
+
+    def __convert_int(self, number) -> bytearray:
+        bytes = bytearray(4)
+        for i in range(4):
+            bytes[3-i] = number % 256
+            number = number >> 8
+        return bytes
 
     def __read_byte(self) -> int:
         byte = self.file.read(1)
@@ -132,7 +188,21 @@ class Qoi:
 
         self.image = decoded_image[0:-8] # discard 8 end marker
 
+# image = Qoi().load("./test_images/qoi_logo.qoi")
+# print(image)
+# new_image = Qoi().save("test.qoi", image.image_data())
+# data = image.image_data()
 
-image = Qoi().load("./test_images/testcard.qoi")
+# Qoi().save('test.qoi', data)
+
+image = Qoi().load("test.qoi")
+print(image)
 i=Image.fromarray(image.image_data())
-i.save("test_image.png")
+i.save("test.png")
+
+# load_image = open("test.qoi", "rb")
+# read = bytearray(load_image.read(14))
+# print(read)
+
+# i=Image.fromarray(image.image_data())
+# i.save("test_image.png")
