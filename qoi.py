@@ -140,6 +140,6 @@ class Qoi:
         self.image = decoded_image[0:-8] # discard 8 end marker
 
 
-image = Qoi().load("./test_images/testcard.qoi")
-i=Image.fromarray(image.image_data())
-i.save("test_image.png")
+# image = Qoi().load("./test_images/testcard.qoi")
+# i=Image.fromarray(image.image_data())
+# i.save("test_image.png")
