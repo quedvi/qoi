@@ -144,7 +144,3 @@ class Qoi:
 image = Qoi().load("./test_images/testcard.qoi")
 i=Image.fromarray(image.image_data())
 i.save("test_image.png")
-
-
-
-# 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
