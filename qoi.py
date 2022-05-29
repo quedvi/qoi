@@ -14,13 +14,13 @@ class Pixel:
     def __repr__(self) -> str:
         return f"Pixel: ({self.r}, {self.g}, {self.b}, {self.a})"
 
-    def diff(self, decode_value) -> 'Pixel':
+    def decode_diff(self, decode_value) -> 'Pixel':
         r = (self.r + (((decode_value >> 4) & 0b11) - 2)) % 256
         g = (self.g + (((decode_value >> 2) & 0b11) - 2)) % 256 
-        b = (self.b + ((decode_value        & 0b11) - 2)) % 256
+        b = (self.b + (( decode_value       & 0b11) - 2)) % 256
         return Pixel(r, g, b, self.a)
     
-    def diff_luma(self, dg, byte) -> 'Pixel':
+    def decode_diff_luma(self, dg, byte) -> 'Pixel':
         nr = byte >> 4
         nb = byte & 0b1111
         ng = dg - 32
@@ -89,14 +89,7 @@ class Qoi:
             return int.from_bytes(byte, 'little')
        
     def __read_bytes(self, count) -> list:
-        read = []
-        for i in range(count):
-            byte = self.file.read(1)
-            if byte == b'':
-                return None
-            read.append(byte)
-            
-        return [int.from_bytes(x, 'little') for x in read]
+        return [ self.__read_byte() for _ in range(count)]
 
     def __decode(self) -> None:
         image_size = self.width() * self.height() * self.channels()
@@ -126,12 +119,12 @@ class Qoi:
                     pixel = array[decode_value]
                     decoded_image.append(pixel)
                 elif decode_type == self.QOI_OP_DIFF:
-                    pixel = pixel.diff(decode_value)
+                    pixel = pixel.decode_diff(decode_value)
                     array[pixel.hash()] = pixel
                     decoded_image.append(pixel)
                 elif decode_type == self.QOI_OP_LUMA:
                     next_byte = self.__read_byte()
-                    pixel = pixel.diff_luma(decode_value, next_byte)
+                    pixel = pixel.decode_diff_luma(decode_value, next_byte)
                     array[pixel.hash()] = pixel
                     decoded_image.append(pixel)
                 elif decode_type == self.QOI_OP_RUN:
@@ -140,6 +133,6 @@ class Qoi:
         self.image = decoded_image[0:-8] # discard 8 end marker
 
 
-# image = Qoi().load("./test_images/testcard.qoi")
-# i=Image.fromarray(image.image_data())
-# i.save("test_image.png")
+image = Qoi().load("./test_images/testcard.qoi")
+i=Image.fromarray(image.image_data())
+i.save("test_image.png")
