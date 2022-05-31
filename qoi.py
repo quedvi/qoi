@@ -77,72 +77,9 @@ class Qoi:
         self.file.close()
         return self
 
-    def __encode(self) -> None:
-        array = [Pixel(0, 0, 0, 0) for _ in range(64)]
-        pixel = Pixel(0, 0, 0, 255) # start value of pixel
-
-        print(len(array))
-
-        channels = self.header["channels"]
-        if channels != 3 and channels != 4: return
-
-        run = 1
-
-        for i in range(self.height()):
-            for j in range(self.width()):
-                if channels == 3:
-                    pixel_new = Pixel(self.image[i,j,0], self.image[i,j,1], self.image[i,j,2], pixel.a)
-                else:
-                    pixel_new = Pixel(self.image[i,j,0], self.image[i,j,1], self.image[i,j,2], self.image[i,j,3])
-
-                # sequential pixels
-                if pixel == pixel_new and run < 63:
-                    run += 1
-                    continue
-
-                # close previous run
-                if run > 1:
-                    frame = bytearray(1)
-                    frame[0] = (self.QOI_OP_RUN << 6) + run - 1
-                    self.file.write(frame)
-                    run = 1
-
-                # lookup the current pixel
-                if array[pixel_new.hash()] == pixel_new:
-                    frame = bytearray(1)
-                    frame[0] = pixel_new.hash()
-                    self.file.write(frame)
-                    pixel = pixel_new
-                    continue
-
-                # encode full pixel
-                pixel = pixel_new
-                if channels == 3:
-                    frame = bytearray(4)
-                    frame[0] = self.QOI_OP_RGB
-                    frame[1] = pixel.r
-                    frame[2] = pixel.b
-                    frame[3] = pixel.g
-                    self.file.write(frame)
-                    array[pixel.hash()] = pixel
-                    continue
-
-                if channels == 4:                  
-                    frame = bytearray(5)
-                    frame[0] = self.QOI_OP_RGBA
-                    frame[1] = pixel.r
-                    frame[2] = pixel.g
-                    frame[3] = pixel.b
-                    frame[4] = pixel.a
-                    self.file.write(frame)
-                    array[pixel.hash()] = pixel
-                    continue
-
-        self.file.write(bytearray(8))
-
     def __repr__(self) -> str:
         return str(self.header)
-    
+
     def height(self) -> int:
         return self.header["height"]
 
@@ -169,6 +106,73 @@ class Qoi:
         self.file.write(self.__convert_int(self.header["height"]))
         self.file.write(self.header["channels"  ].to_bytes(1, byteorder = 'little'))
         self.file.write(self.header["colorspace"].to_bytes(1, byteorder = 'little'))
+
+    def __write_run(self, run) -> None:
+        frame = bytearray(1)
+        frame[0] = (self.QOI_OP_RUN << 6) + run - 1
+        self.file.write(frame)
+
+    def __encode(self) -> None:
+        array = [Pixel(0, 0, 0, 0) for _ in range(64)]
+        pixel = Pixel(0, 0, 0, 255) # start value of pixel
+
+        channels = self.header["channels"]
+        if channels != 3 and channels != 4: return
+
+        run = 0
+
+        for i in range(self.height()):
+            for j in range(self.width()):
+                if channels == 3:
+                    pixel_new = Pixel(self.image[i,j,0], self.image[i,j,1], self.image[i,j,2], pixel.a)
+                else:
+                    pixel_new = Pixel(self.image[i,j,0], self.image[i,j,1], self.image[i,j,2], self.image[i,j,3])
+
+                # sequential pixels
+                if pixel == pixel_new and run < 62: 
+                    run += 1
+                    continue
+
+                # close previous run
+                if run > 1:
+                    self.__write_run(run)
+                    run = 0
+
+                # lookup current pixel
+                if array[pixel_new.hash()] == pixel_new:
+                    frame = bytearray(1)
+                    frame[0] = pixel_new.hash()
+                    self.file.write(frame)
+                    pixel = pixel_new
+                    continue
+
+                # write full pixel data
+                pixel = pixel_new
+                if channels == 3:
+                    frame = bytearray(4)
+                    frame[0] = self.QOI_OP_RGB
+                    frame[1] = pixel.r
+                    frame[2] = pixel.b
+                    frame[3] = pixel.g
+                    self.file.write(frame)
+                    array[pixel.hash()] = pixel
+                    continue
+                
+                if channels == 4:                  
+                    frame = bytearray(5)
+                    frame[0] = self.QOI_OP_RGBA
+                    frame[1] = pixel.r
+                    frame[2] = pixel.g
+                    frame[3] = pixel.b
+                    frame[4] = pixel.a
+                    self.file.write(frame)
+                    array[pixel.hash()] = pixel
+                    continue
+
+        # close open runs
+        if run > 1: self.__write_run(run)
+        # write end marker
+        self.file.write(bytearray(8))
 
     def __convert_int(self, number) -> bytearray:
         bytes = bytearray(4)
@@ -229,15 +233,16 @@ class Qoi:
         self.image = decoded_image[0:-8] # discard 8 end marker
 
 
-# image = Qoi().load("./test_images/testcard.qoi")
-# print(image)
-# data = image.image_data()
-# Qoi().save('test.qoi', data)
+image = Qoi().load("./test_images/testcard.qoi")
+print(image)
+data = image.image_data()
+Qoi().save('test.qoi', data)
 
-# image2 = Qoi().load("test.qoi")
-# print(image2)
-# i = Image.fromarray(image2.image_data())
-# i.save("test.png")
+image2 = Qoi().load("test.qoi")
+print(image2)
+image2.image
+i = Image.fromarray(image2.image_data())
+i.save("test.png")
 
 # load_image = open("test.qoi", "rb")
 # read = bytearray(load_image.read(14))
