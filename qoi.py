@@ -140,7 +140,7 @@ class Qoi:
 
                 # sequential pixels
                 if pixel == pixel_new and run < 62:
-                    cases['run'] +=1
+                    cases['run'] += 1
                     run += 1
                     continue
 
@@ -151,7 +151,7 @@ class Qoi:
 
                 # lookup current pixel
                 if array[pixel_new.hash()] == pixel_new:
-                    cases['lookup'] +=1
+                    cases['lookup'] += 1
                     frame = bytearray(1)
                     frame[0] = pixel_new.hash()
                     self.file.write(frame)
@@ -159,33 +159,33 @@ class Qoi:
                     continue
 
                 if pixel.a != pixel_new.a:
-                    cases['full1'] +=1
+                    cases['full2'] += 1
                     self.__write_rgba(pixel_new.r, pixel_new.g, pixel_new.b, pixel_new.a)
                     array[pixel_new.hash()] = pixel_new
                     pixel = pixel_new
                     continue
-
                 
                 dr = np.intc(pixel_new.r) - np.intc(pixel.r)
                 dg = np.intc(pixel_new.g) - np.intc(pixel.g)
                 db = np.intc(pixel_new.b) - np.intc(pixel.b)
-                if dr > 128:  dr -= 256
-                if dg > 128: dg -= 256
-                if db > 128: db -= 256
+                if dr >  128: dr -= 256
+                if dg >  128: dg -= 256
+                if db >  128: db -= 256
                 if dr < -127: dr += 256
                 if dg < -127: dg += 256
-                if dg < -127: dg += 256
+                if db < -127: db += 256
                 dg_r = dr - dg
                 dg_b = db - dg
-                # if dg_r > 128: dg_r -= 256
-                # if dg_b > 128: dg_b -= 256
-                
+                if dg_r >  128: dg_r -= 256
+                if dg_b >  128: dg_b -= 256
+                if dg_r < -127: dg_r += 256
+                if dg_b < -127: dg_b += 256
+              
+                # print(f'{i}/{j}: {(dr + 2) << 4 | (dg + 2) << 2 | (db + 2)} | {dr},{dg},{db} | {dg_r}, {dg_b} | {pixel} -> {pixel_new}')
+
                 # small diff
                 if all(-3 < x < 2 for x in (dr, dg, db)):
-                    cases['diff'] +=1                    
-                    # encode = (dr + 2) << 4 | (dg + 2) << 2 | (db + 2)
-                    # if i > 0 and i < 2:
-                    #     print(f'{i}/{j}: {encode} | {dr},{dg},{db} | {pixel} -> {pixel_new}')
+                    cases['diff'] += 1                    
                     frame = bytearray([self.QOI_OP_DIFF << 6 | (dr + 2) << 4 | (dg + 2) << 2 | (db + 2)])
                     self.file.write(frame)
                     array[pixel_new.hash()] = pixel_new
@@ -194,7 +194,7 @@ class Qoi:
 
                 # medium diff
                 elif all(-9 < x < 8 for x in (dg_r, dg_b)) and -33 < dg < 32:
-                    cases['diff2'] +=1                    
+                    cases['diff2'] += 1                    
                     frame = bytearray(2)
                     frame[0] = self.QOI_OP_LUMA << 6 | (dg + 32)
                     frame[1] = (dg_r + 8) << 4 | (dg_b + 8)
@@ -204,7 +204,7 @@ class Qoi:
                     continue
 
                 # write full pixel data
-                cases['full2'] +=1
+                cases['full1'] += 1
                 self.__write_rgb(pixel_new.r, pixel_new.g, pixel_new.b)
                 array[pixel_new.hash()] = pixel_new
                 pixel = pixel_new
@@ -212,7 +212,7 @@ class Qoi:
         # close open runs
         if run > 1: self.__write_run(run)
         # write end marker
-        print(cases)
+        print(f'{cases} / {sum(cases.values())}')
         self.file.write(bytearray(8))
 
     def __convert_int(self, number) -> bytearray:
@@ -235,7 +235,9 @@ class Qoi:
     def __decode(self) -> None:
         image_size = self.width() * self.height() * self.channels()
         decoded_image = []
-        
+
+        cases = { 'run': 0, 'lookup': 0, 'diff': 0, 'diff2': 0, 'full1': 0, 'full2': 0 }
+
         array = [Pixel(0, 0, 0, 0) for _ in range(64)]
         pixel = Pixel(0, 0, 0, 255) # start value of pixel
 
@@ -244,11 +246,13 @@ class Qoi:
             if value is None: break
 
             if value == self.QOI_OP_RGB:
+                cases['full1'] += 1
                 r, g, b = self.__read_bytes(3)
                 pixel = Pixel(r, g, b, pixel.a)
                 array[pixel.hash()] = pixel
                 decoded_image.append(pixel)
             elif value == self.QOI_OP_RGBA:
+                cases['full2'] += 1
                 r, g, b, a = self.__read_bytes(4)
                 pixel = Pixel(r, g, b, a)
                 array[pixel.hash()] = pixel
@@ -257,37 +261,35 @@ class Qoi:
                 decode_type = value // 64
                 decode_value = value % 64
                 if decode_type == self.QOI_OP_INDEX:
+                    cases['lookup'] += 1
                     pixel = array[decode_value]
                     decoded_image.append(pixel)
                 elif decode_type == self.QOI_OP_DIFF:
+                    cases['diff'] += 1
                     pixel = pixel.decode_diff(decode_value)
                     array[pixel.hash()] = pixel
                     decoded_image.append(pixel)
                 elif decode_type == self.QOI_OP_LUMA:
+                    cases['diff2'] += 1
                     next_byte = self.__read_byte()
                     pixel = pixel.decode_diff_luma(decode_value, next_byte)
                     array[pixel.hash()] = pixel
                     decoded_image.append(pixel)
                 elif decode_type == self.QOI_OP_RUN:
+                    cases['run'] += decode_value + 1
                     [decoded_image.append(pixel) for _ in range(decode_value + 1)]
 
+        print(f'{cases} / {sum(cases.values())}')
         self.image = decoded_image[0:-8] # discard 8 end marker
 
 
-image = Qoi().load("./test_images/testcard.qoi")
-print(image)
+print("load:")
+image = Qoi().load("./test_images/qoi_logo.qoi")
 data = image.image_data()
+print("save:")
 Qoi().save('test.qoi', data)
 
+print("load_again:")
 image2 = Qoi().load("test.qoi")
-print(image2)
-image2.image
 i = Image.fromarray(image2.image_data())
 i.save("test.png")
-
-# load_image = open("test.qoi", "rb")
-# read = bytearray(load_image.read(14))
-# print(read)
-
-# i=Image.fromarray(image.image_data())
-# i.save("test_image.png")
