@@ -12,7 +12,7 @@ class Pixel:
         self.a = a
 
     def __repr__(self) -> str:
-        return f"Pixel: ({self.r}, {self.g}, {self.b}, {self.a})"
+        return f"({self.r}, {self.g}, {self.b}, {self.a})"
 
     def __eq__(self, other) -> bool:
         return self.r == other.r and self.g == other.g and self.b == other.b and self.a == other.a
@@ -97,6 +97,7 @@ class Qoi:
             data = [np.array([np.uint8(x.r), np.uint8(x.g), np.uint8(x.b)]) for x in self.image]
         elif self.channels() == 4:
             data = [np.array([np.uint8(x.r), np.uint8(x.g), np.uint8(x.b), np.uint8(x.a)]) for x in self.image]
+
         array = np.array(data).reshape(self.height(), self.width(), self.channels())
         return array
 
@@ -112,6 +113,14 @@ class Qoi:
         frame[0] = (self.QOI_OP_RUN << 6) + run - 1
         self.file.write(frame)
 
+    def __write_rgba(self, r, g, b, a) -> None:
+        frame = bytearray([self.QOI_OP_RGBA, r, g, b, a])
+        self.file.write(frame)
+
+    def __write_rgb(self, r, g, b) -> None:
+        frame = bytearray([self.QOI_OP_RGB, r, g, b])
+        self.file.write(frame)
+
     def __encode(self) -> None:
         array = [Pixel(0, 0, 0, 0) for _ in range(64)]
         pixel = Pixel(0, 0, 0, 255) # start value of pixel
@@ -120,6 +129,7 @@ class Qoi:
         if channels != 3 and channels != 4: return
 
         run = 0
+        cases = { 'run': 0, 'lookup': 0, 'diff': 0, 'diff2': 0, 'full1': 0, 'full2': 0 }
 
         for i in range(self.height()):
             for j in range(self.width()):
@@ -129,49 +139,80 @@ class Qoi:
                     pixel_new = Pixel(self.image[i,j,0], self.image[i,j,1], self.image[i,j,2], self.image[i,j,3])
 
                 # sequential pixels
-                if pixel == pixel_new and run < 62: 
+                if pixel == pixel_new and run < 62:
+                    cases['run'] +=1
                     run += 1
                     continue
 
                 # close previous run
-                if run > 1:
+                if run > 0:
                     self.__write_run(run)
                     run = 0
 
                 # lookup current pixel
                 if array[pixel_new.hash()] == pixel_new:
+                    cases['lookup'] +=1
                     frame = bytearray(1)
                     frame[0] = pixel_new.hash()
                     self.file.write(frame)
                     pixel = pixel_new
                     continue
 
-                # write full pixel data
-                pixel = pixel_new
-                if channels == 3:
-                    frame = bytearray(4)
-                    frame[0] = self.QOI_OP_RGB
-                    frame[1] = pixel.r
-                    frame[2] = pixel.b
-                    frame[3] = pixel.g
-                    self.file.write(frame)
-                    array[pixel.hash()] = pixel
-                    continue
-                
-                if channels == 4:                  
-                    frame = bytearray(5)
-                    frame[0] = self.QOI_OP_RGBA
-                    frame[1] = pixel.r
-                    frame[2] = pixel.g
-                    frame[3] = pixel.b
-                    frame[4] = pixel.a
-                    self.file.write(frame)
-                    array[pixel.hash()] = pixel
+                if pixel.a != pixel_new.a:
+                    cases['full1'] +=1
+                    self.__write_rgba(pixel_new.r, pixel_new.g, pixel_new.b, pixel_new.a)
+                    array[pixel_new.hash()] = pixel_new
+                    pixel = pixel_new
                     continue
 
+                
+                dr = np.intc(pixel_new.r) - np.intc(pixel.r)
+                dg = np.intc(pixel_new.g) - np.intc(pixel.g)
+                db = np.intc(pixel_new.b) - np.intc(pixel.b)
+                if dr > 128:  dr -= 256
+                if dg > 128: dg -= 256
+                if db > 128: db -= 256
+                if dr < -127: dr += 256
+                if dg < -127: dg += 256
+                if dg < -127: dg += 256
+                dg_r = dr - dg
+                dg_b = db - dg
+                # if dg_r > 128: dg_r -= 256
+                # if dg_b > 128: dg_b -= 256
+                
+                # small diff
+                if all(-3 < x < 2 for x in (dr, dg, db)):
+                    cases['diff'] +=1                    
+                    # encode = (dr + 2) << 4 | (dg + 2) << 2 | (db + 2)
+                    # if i > 0 and i < 2:
+                    #     print(f'{i}/{j}: {encode} | {dr},{dg},{db} | {pixel} -> {pixel_new}')
+                    frame = bytearray([self.QOI_OP_DIFF << 6 | (dr + 2) << 4 | (dg + 2) << 2 | (db + 2)])
+                    self.file.write(frame)
+                    array[pixel_new.hash()] = pixel_new
+                    pixel = pixel_new       
+                    continue
+
+                # medium diff
+                elif all(-9 < x < 8 for x in (dg_r, dg_b)) and -33 < dg < 32:
+                    cases['diff2'] +=1                    
+                    frame = bytearray(2)
+                    frame[0] = self.QOI_OP_LUMA << 6 | (dg + 32)
+                    frame[1] = (dg_r + 8) << 4 | (dg_b + 8)
+                    self.file.write(frame)
+                    array[pixel_new.hash()] = pixel_new
+                    pixel = pixel_new       
+                    continue
+
+                # write full pixel data
+                cases['full2'] +=1
+                self.__write_rgb(pixel_new.r, pixel_new.g, pixel_new.b)
+                array[pixel_new.hash()] = pixel_new
+                pixel = pixel_new
+                
         # close open runs
         if run > 1: self.__write_run(run)
         # write end marker
+        print(cases)
         self.file.write(bytearray(8))
 
     def __convert_int(self, number) -> bytearray:
