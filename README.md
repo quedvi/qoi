@@ -32,5 +32,6 @@ A file with name image_file.png will be saved on the same folder as the original
       -h, --help            show this help message and exit
       -e, --encode
       -d, --decode
+      -v, --verbose         get additional info
       -f FILE_PATH, --file-path FILE_PATH
                             path to image file to be encoded or decoded
