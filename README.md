@@ -1,7 +1,7 @@
 # Python QOI
 [QOI (Quite OK Image format)](https://github.com/phoboslab/qoi) is a new lossless image format that achieves compression rates close to PNG with a 20x-50x faster encoding.
 
-This here is a naive Python way of implementing the QOI conpression format and of course much slower than the C implementation. 
+This here is a naive Python way of implementing the QOI compression format and of course much slower than the C implementation. 
 
 There's a [python wrapper](https://github.com/kodonnell/qoi) around the original C implementation, which retains the C performance.
 
