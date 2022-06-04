@@ -1,4 +1,5 @@
 from typing import List
+import argparse
 import numpy as np
 from PIL import Image
 
@@ -63,7 +64,8 @@ class Qoi:
         self.cases = { 'run': 0, 'lookup': 0, 'diff': 0, 'diff2': 0, 'full1': 0, 'full2': 0 }
 
         header = bytearray(self.file.read(14))
-        if header[0:4] != b'qoif': return None
+        if header[0:4] != b'qoif': 
+            raise ValueError('Error: Image does not contain a valid QOI header!')
 
         self.header["head"      ] = b'qoif'
         self.header["width"     ] = header[4] * 16**6 + header[5] * 16**4 + header[6]  * 16**2 + header[7]
@@ -71,12 +73,19 @@ class Qoi:
         self.header["channels"  ] = header[12]
         self.header["colorspace"] = header[13]
 
+        if self.header["channels"] not in [3, 4]:
+            raise ValueError(f'Error: Unsupported Image mode: {self.header["channels"]}!')
+
         self.image = []
         self.__decode()
         return self
 
     def save(self, file_name, data) -> 'Qoi':
         height, width, channels = data.shape
+
+        if channels not in [3, 4]:
+            raise ValueError(f'Error: Unsupported Image mode: {channels}!')
+
         self.image = data
         self.file = open(file_name, "wb")
         self.header = { "name": file_name }
@@ -282,16 +291,43 @@ class Qoi:
         self.image = decoded_image[0:-8] # discard 8 end marker
 
 
-print("load:")
-image = Qoi().load("./test_images/qoi_logo.qoi")
-print(image.status())
-data = image.image_data()
-print("save:")
-si = Qoi().save('test.qoi', data)
-print(si.status())
+def replace_extension(path: str, extension: str) -> str:
+    old_extension = path.split('.')[-1]
+    new_path = path.replace(old_extension, extension)
+    return new_path
 
-print("load_again:")
-image2 = Qoi().load("test.qoi")
-print(image2.status())
-i = Image.fromarray(image2.image_data())
-i.save("test.png")
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-e', '--encode',  action='store_true', default=False)
+    parser.add_argument('-d', '--decode',  action='store_true', default=False)
+    parser.add_argument('-v', '--verbose', action='store_true', default=False)
+    parser.add_argument(
+        '-f', '--file-path', type=str,
+        help='path to image file to be encoded or decoded', required=True)
+    args = parser.parse_args()
+
+    if args.encode:
+        if args.verbose: print(f'loading {args.file_path}...')
+        try:
+            image = Image.open(args.file_path)
+        except Exception as exc:
+            print(f'image load failed: {exc}')
+            return
+
+        out_path = replace_extension(args.file_path, 'qoi')
+        if args.verbose: print(f'writing {out_path}...')
+        new_image = Qoi().save(out_path, np.asarray(image))
+        if args.verbose: print(new_image.status())
+
+    if args.decode:
+        if args.verbose: print(f'loading {args.file_path}...')
+        image = Qoi().load(args.file_path)
+        if args.verbose: print(image.status())
+
+        out_path = replace_extension(args.file_path, 'png')
+        if args.verbose: print(f'writing {out_path}...')
+        png = Image.fromarray(image.image_data())
+        png.save(out_path)
+
+if __name__ == '__main__':
+    main()
