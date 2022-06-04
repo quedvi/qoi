@@ -307,7 +307,7 @@ def main():
     args = parser.parse_args()
 
     if args.encode:
-        if args.verbose: print(f'loading {args.file_path}...')
+        if args.verbose: print(f'loading:      {args.file_path}...')
         try:
             image = Image.open(args.file_path)
         except Exception as exc:
@@ -315,17 +315,17 @@ def main():
             return
 
         out_path = replace_extension(args.file_path, 'qoi')
-        if args.verbose: print(f'writing {out_path}...')
+        if args.verbose: print(f'writing:      {out_path}...')
         new_image = Qoi().save(out_path, np.asarray(image))
-        if args.verbose: print(new_image.status())
+        if args.verbose: print(f'encode_stats: {new_image.status()}')
 
     if args.decode:
-        if args.verbose: print(f'loading {args.file_path}...')
+        if args.verbose: print(f'loading:      {args.file_path}...')
         image = Qoi().load(args.file_path)
-        if args.verbose: print(image.status())
+        if args.verbose: print(f'decode_stats: {image.status()}')
 
         out_path = replace_extension(args.file_path, 'png')
-        if args.verbose: print(f'writing {out_path}...')
+        if args.verbose: print(f'writing:      {out_path}...')
         png = Image.fromarray(image.image_data())
         png.save(out_path)
 
