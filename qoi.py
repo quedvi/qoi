@@ -1,3 +1,4 @@
+from typing import List
 import numpy as np
 from PIL import Image
 
@@ -16,6 +17,18 @@ class Pixel:
 
     def __eq__(self, other) -> bool:
         return self.r == other.r and self.g == other.g and self.b == other.b and self.a == other.a
+
+    def diff_rollover(self, other) -> List:
+        dr = np.intc(self.r) - np.intc(other.r)
+        dg = np.intc(self.g) - np.intc(other.g)
+        db = np.intc(self.b) - np.intc(other.b)
+        if dr >  128: dr -= 256
+        if dg >  128: dg -= 256
+        if db >  128: db -= 256
+        if dr < -127: dr += 256
+        if dg < -127: dg += 256
+        if db < -127: db += 256
+        return dr, db, dg
 
     def decode_diff(self, decode_value) -> 'Pixel':
         r = (self.r + (((decode_value >> 4) & 0b11) - 2)) % 256
@@ -165,23 +178,9 @@ class Qoi:
                     pixel = pixel_new
                     continue
                 
-                dr = np.intc(pixel_new.r) - np.intc(pixel.r)
-                dg = np.intc(pixel_new.g) - np.intc(pixel.g)
-                db = np.intc(pixel_new.b) - np.intc(pixel.b)
-                if dr >  128: dr -= 256
-                if dg >  128: dg -= 256
-                if db >  128: db -= 256
-                if dr < -127: dr += 256
-                if dg < -127: dg += 256
-                if db < -127: db += 256
+                dr, db, dg = pixel_new.diff_rollover(pixel)
                 dg_r = dr - dg
                 dg_b = db - dg
-                if dg_r >  128: dg_r -= 256
-                if dg_b >  128: dg_b -= 256
-                if dg_r < -127: dg_r += 256
-                if dg_b < -127: dg_b += 256
-              
-                # print(f'{i}/{j}: {(dr + 2) << 4 | (dg + 2) << 2 | (db + 2)} | {dr},{dg},{db} | {dg_r}, {dg_b} | {pixel} -> {pixel_new}')
 
                 # small diff
                 if all(-3 < x < 2 for x in (dr, dg, db)):
