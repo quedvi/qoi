@@ -1,14 +1,19 @@
 from setuptools import setup
 
+with open("README.md", "r", encoding="utf-8") as fh:
+    long_description = fh.read()
+
 setup(
-    name='QOI',
-    version='0.1.0',    
+    name='qoi-conv',
+    version='1.0.1',    
     description='A simple implementation of the QOI image format in Pyhton.',
+    long_description=long_description,
+    long_description_content_type="text/markdown",    
     url='https://github.com/quedvi/qoi',
     author='Martin Oehzelt',
     author_email='oehzelt@gmx.at',
     license='MIT',
-    packages=['qoi'],
+    packages=['qoi-conv'],
     install_requires=['pillow>=9.0.1',
                       'numpy>=1.22.3',
                       ],

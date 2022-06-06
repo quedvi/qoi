@@ -9,25 +9,25 @@ The CLI interface was liberally borrowed from [Python QOI (py-qoi)](https://gith
 
 ## Requirements
 
-The only requirement besides Python 3.7+ is Pillow to load and save images in formats other than QOI.
+The only requirement besides Python 3.10+ is Pillow to load and save images in formats other than QOI, and numpy for matrix manipulations.
 
 ## Usage
 
 To encode an image:
 
-    python3 qoi.py -e -f image_file.png
+    python3 qoi-quedvi/qoi.py -e -f image_file.png
 
 The input image may be of any [pillow-supported format](https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html).
 A file with name image_file.qoi will be saved on the same folder as the original image.
 
 To decode a QOI image:
 
-    python3 qoi.py -d -f image_file.qoi
+    python3 qoi-conv/qoi.py -d -f image_file.qoi
 
 A file with name image_file.png will be saved on the same folder as the original image.
 
 
-    usage: qoi.py [-h] [-e] [-d] [-f FILE_PATH]
+    usage: qoi-quedvi/qoi.py [-h] [-e] [-d] [-f FILE_PATH]
     optional arguments:
       -h, --help            show this help message and exit
       -e, --encode
