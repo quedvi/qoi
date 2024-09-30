@@ -47,7 +47,12 @@ class Pixel:
         return Pixel(r, g, b, self.a)
 
     def hash(self) -> int:
-        return ((self.r * 3 + self.g * 5 + self.b * 7 + self.a * 11) % 64)
+        r = int(self.r)
+        g = int(self.g)
+        b = int(self.b)
+        a = int(self.a)
+        hash_val = (r * 3 + g * 5 + b * 7 + a * 11) % 64
+        return hash_val
 
 class Qoi:
     QOI_OP_RGB  = 0b11111110 # 254
