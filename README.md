@@ -11,6 +11,13 @@ The CLI interface was liberally borrowed from [Python QOI (py-qoi)](https://gith
 
 The only requirement besides Python 3.10+ is Pillow to load and save images in formats other than QOI, and numpy for matrix manipulations.
 
+
+## Install
+
+Packaged at https://pypi.org/project/qoi-conv/
+
+    pip install qoi-conv
+
 ## Usage
 
 To encode an image:
