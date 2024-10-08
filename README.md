@@ -16,7 +16,7 @@ The only requirement besides Python 3.10+ is Pillow to load and save images in f
 
 Packaged at https://pypi.org/project/qoi-conv/
 
-    pip install qoi-conv
+    pip3 install qoi-conv
 
 ## Usage
 
