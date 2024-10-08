@@ -5,3 +5,5 @@
 __pycache__
 qoi_conv.egg-info
 dist
+tmp
+build
